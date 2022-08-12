@@ -1,0 +1,292 @@
+---
+title: "Mercado_Libre_EDA_08112022"
+author: "Trevor"
+date: "8/12/2022"
+output: html_document
+---
+
+```{r}
+library('scales')
+library('tidyverse')
+
+head(data)
+
+
+# number of vendors
+data %>%
+  distinct(vendor) %>%
+  nrow()
+
+# number of active vendors
+data %>%
+  filter(active_seller==1) %>%
+  distinct(vendor) %>%
+  nrow()
+
+# total monthly revenue in the market
+data %>%
+  mutate(revenue=(price_in_soles*items_sold)/3) %>%
+  summarise(totrevenue=sum(revenue, na.rm=TRUE))
+
+
+#check data for NA
+map(data, ~sum(is.na(.)))
+
+
+
+
+# top vendors by units sold
+data %>%
+  filter(active_seller==1) %>%
+  group_by(vendor) %>%
+  summarise(totsales=round(sum(items_sold/3, na.rm=TRUE))) %>%
+  arrange(desc(totsales)) %>%
+  top_n(10) %>%
+  ggplot(aes(x= reorder(vendor, -totsales), y=totsales)) +
+  geom_bar(stat='identity', fill='steelblue') +
+  scale_y_continuous(labels=comma)+
+  theme(plot.title=element_text(hjust=0.5),
+        axis.text.x=element_text(angle=45,hjust=1)) +
+  xlab('') +
+  ylab('Total units sold per month')+
+  ggtitle('Top 10 Vendors by Units Sold')
+
+ggsave('Graph1.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+
+```
+
+```{r}
+# top vendors by monthly revenue
+data %>%
+  filter(active_seller==1) %>%
+  mutate(revenue=(price_in_dollars*items_sold)/3) %>%
+  group_by(vendor) %>%
+  summarise(totrevenue=sum(revenue, na.rm=TRUE)) %>%
+  arrange(desc(totrevenue)) %>%
+  top_n(10) %>%
+  ggplot(aes(x= reorder(vendor, -totrevenue), y=totrevenue)) +
+  geom_bar(stat='identity', fill='steelblue') +
+  scale_y_continuous(labels=comma)+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1)) +
+  xlab('') +
+  ylab('Total monthly revenue (USD$)')+
+  ggtitle('Top 10 Vendors by Revenue')
+
+ggsave('Graph2.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+```
+
+
+```{r}
+
+#for active sellers, what is the weighted average product review
+
+data %>%
+  filter(total_item_sales>100) %>%
+  mutate(score=product_rating*items_sold) %>%
+  group_by(vendor,total_item_sales) %>%
+  summarise(totalscore=sum(score, na.rm=TRUE)) %>%
+  summarise(wtd_avg=totalscore/total_item_sales) %>%
+  arrange(desc(wtd_avg)) %>%
+  top_n(10) %>%
+  ggplot(aes(x= reorder(vendor, -wtd_avg), y=wtd_avg)) +
+  geom_bar(stat='identity', fill='steelblue') +
+  scale_y_continuous(labels=comma)+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1)) +
+  xlab('') +
+  ylab('Weighted average review (out of 5)')+
+  ggtitle('Top 10 Vendors by Average Review')
+
+ggsave('Graph3.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+  
+
+
+
+```
+
+```{r}
+
+data %>%
+  filter(total_item_sales>100) %>%
+  mutate(score=product_rating*items_sold, na.rm=TRUE) %>%
+  group_by(brand) %>%
+  summarise(totalscore=sum(score, na.rm=TRUE),
+            totalsales=sum(items_sold, na.rm=TRUE),
+            wtd_avg=totalscore/totalsales) %>%
+  filter(wtd_avg>0) %>%
+  arrange(desc(wtd_avg)) %>%
+  ggplot(aes(x= reorder(brand, -wtd_avg), y=wtd_avg)) +
+  geom_bar(stat='identity', fill='steelblue') +
+  scale_y_continuous(labels=comma)+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1)) +
+  xlab('') +
+  ylab('Weighted average review (out of 5)')+
+  ggtitle('Top Brands by Average Review')
+
+ggsave('Graph3a.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+```
+
+
+
+```{r}
+
+#scatter plot sales and revenue
+
+data %>%
+  filter(brand!='Other')%>%
+  group_by(brand) %>%
+  summarise(sales=sum(items_sold/3, na.rm=TRUE),
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  ggplot(aes(x=sales, y=revenue))+
+  geom_point() +
+  scale_y_continuous(labels=comma)+
+  xlab('Total units sold per month') +
+  ylab('Total monthly revenue (USD$)')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('Total Monthly Sales and Revenue by Brand')
+
+ggsave('Graph4.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+```
+
+
+```{r}
+
+data %>%
+  group_by(vendor) %>%
+  filter(active_seller==1) %>%
+  summarise(sales=mean(total_item_sales))
+
+
+
+# create total revenue by vendor ranking column
+
+
+
+
+data %>%
+  filter(vendor=='QUETALC'| 
+           vendor=='TIENDAA') %>%
+  group_by(vendor, brand) %>%
+  summarise(sales=sum(items_sold, na.rm=TRUE),
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  ggplot(aes(x=reorder(vendor, -sales), y=sales, fill=brand)) +
+  geom_bar(position='stack', stat='identity')+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(labels=comma)+
+  xlab('') +
+  ylab('Total units sold per month')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('QUETALC vs. TIENDAA: Sales')
+
+ggsave('Graph5.png',last_plot(), width=3.5, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+
+
+data %>%
+  filter(vendor=='QUETALC'| 
+           vendor=='TIENDAA') %>%
+  group_by(vendor, brand) %>%
+  summarise(sales=sum(items_sold, na.rm=TRUE),
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  ggplot(aes(x=reorder(vendor, -sales), y=revenue, fill=brand)) +
+  geom_bar(position='stack', stat='identity')+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(labels=comma)+
+  xlab('') +
+  ylab('Total monthly revenue (USD$)')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('QUETALC vs. TIENDAA: Revenue')
+
+ggsave('Graph6.png',last_plot(), width=3.5, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+  
+
+       
+```
+
+```{r}
+
+
+data %>%
+  filter(total_item_sales>500) %>%
+  group_by(vendor, brand) %>%
+  summarise(sales=sum(items_sold, na.rm=TRUE),
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  ggplot(aes(x=reorder(vendor, -revenue), y=revenue, fill=brand)) +
+  geom_bar(position='stack', stat='identity')+
+  theme(plot.title=element_text(hjust=0.5),axis.text.x=element_text(angle=45,hjust=1))+
+  scale_y_continuous(labels=comma)+
+  xlab('') +
+  ylab('Total monthly revenue (USD$)')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('Top Vendors by Total Monthly Revenue and Brand')
+  
+ggsave('Graph7.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+  
+  
+```
+
+
+```{r}
+
+# plot listings and revenue
+  
+
+data %>%
+  filter(active_seller==1) %>%
+  group_by(vendor) %>%
+  summarise(listings=n(),
+            sales=sum(items_sold, na.rm=TRUE),
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  ggplot(aes(x=listings, y=revenue))+
+  geom_point() +
+  scale_y_continuous(labels=comma)+
+  xlab('Total active product listings') +
+  ylab('Total monthly revenue (USD$)')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('Total product listings and monthly revenue by vendor')
+            
+
+
+ggsave('Graph8.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+
+```
+
+
+```{r}
+
+# plot revenue by weighted customer rating
+
+data %>%
+  filter(total_item_sales>100) %>%
+  filter(total_product_ratings>10) %>%
+  mutate(score=product_rating*items_sold, na.rm=TRUE) %>%
+  group_by(vendor) %>%
+  summarise(totalscore=sum(score, na.rm=TRUE),
+            totalsales=sum(items_sold, na.rm=TRUE),
+            wtd_avg=totalscore/totalsales,
+            revenue=sum((items_sold*price_in_dollars)/3, na.rm=TRUE)) %>%
+  filter(wtd_avg>0) %>%
+  arrange(desc(wtd_avg)) %>%
+  ggplot(aes(x=wtd_avg, y=revenue))+
+  geom_point() +
+  scale_y_continuous(labels=comma)+
+  xlab('Average product review') +
+  ylab('Total monthly revenue (USD$)')+
+  theme(plot.title=element_text(hjust=0.5))+
+  ggtitle('Average product review and monthly revenue by vendor')
+
+
+ggsave('Graph9.png',last_plot(), width=7, height=4, path= '/users/trevor.mattos/desktop/nycdsa/R')
+
+
+```
+
